@@ -40,3 +40,6 @@ Referência: https://supabase.com/docs/guides/database/database-linter?lint=0028
 - Duas solicitações simultâneas não recebem o mesmo número GL.
 - A falha do provedor de e-mail é registrada para reenvio, sem perder o aceite.
 - PDF corresponde à versão aprovada.
+
+## Atualização desta etapa
+Backend candidato implementado com wrappers SECURITY INVOKER no public e funções privadas SECURITY DEFINER, search_path vazio, grants explícitos e checagem de auth.uid()/perfil ativo/autor. Sem grants diretos às tabelas. Validado em PGlite; ainda não aplicado no Supabase. Consulte STATUS_DESENVOLVIMENTO.md.

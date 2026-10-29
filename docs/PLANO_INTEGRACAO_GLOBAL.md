@@ -24,3 +24,6 @@
 - Verificar conteúdo do index.html e formato da aplicação.
 - Confirmar estratégia de homologação do banco e provedor de e-mail.
 - Não executar migrations ou deploy até revisão técnica e autorização.
+
+## Atualização 29/10/2026
+Persistência autenticada, numeração, histórico e validações implementados como candidato; consulte STATUS_DESENVOLVIMENTO.md para testes e pendências atuais. A política adotada é isolamento por autor entre administradores. O antigo rascunho de schema foi substituído pela migration versionada. Aprovação e e-mail automático ainda pendentes.
