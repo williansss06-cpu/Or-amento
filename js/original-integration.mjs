@@ -8,7 +8,7 @@ const message=s=>{el('cloud-status').textContent=s};
 const emailText={sent:'Notificação enviada ao provedor.',pending:'Notificação aguardando envio.',failed:'Envio não confirmado; aceite preservado.',sending:'Envio em andamento.',pending_configuration:'E-mail pendente de configuração do provedor.',already_sent_or_processing:'Notificação já enviada ou em processamento.'};
 function buttons(){
  document.querySelectorAll('#fields input,#fields textarea,#fields button,.toolbar button,#cloud-history-list button,#cloud-login button').forEach(x=>x.disabled=busy);
- el('cloud-save').disabled=busy||!signedIn()||Boolean(savedSignature);
+ el('cloud-save').disabled=busy||Boolean(savedSignature);el('cloud-save').textContent=!signedIn()?'Entrar para salvar orçamento':'Salvar orçamento no sistema';
  el('cloud-history').disabled=busy||!signedIn();el('cloud-logout').hidden=!signedIn();
  el('cloud-issue').disabled=busy||!savedSignature||!signedIn()||Boolean(approval?.approved_at);
  el('cloud-check').disabled=busy||!savedSignature||!signedIn();
@@ -53,10 +53,12 @@ async function checkApproval(){
 }
 el('cloud-login').onsubmit=async e=>{
  e.preventDefault();busy=true;buttons();
- try{await login(el('cloud-email').value.trim(),el('cloud-password').value);el('cloud-login').hidden=true;message('Sessão iniciada. O modelo original pode ser salvo no Supabase.')}catch(error){message(error.message)}finally{el('cloud-password').value='';busy=false;buttons()}
+ try{message('Entrando no sistema…');await login(el('cloud-email').value.trim(),el('cloud-password').value);el('cloud-login').hidden=true;message('Sessão iniciada. O modelo original pode ser salvo no Supabase.')}catch(error){const detail=error.message==='Invalid login credentials'?'E-mail ou senha não conferem. Use a conta administrativa cadastrada no Global Shop.':error.message;message(detail);alert(detail)}finally{el('cloud-password').value='';busy=false;buttons()}
 };
 el('cloud-logout').onclick=async()=>{try{await logout()}catch{}finally{el('cloud-login').hidden=false;el('cloud-history-list').replaceChildren();invalidate();window.update();message('Sessão encerrada.')}};
 el('cloud-save').onclick=async()=>{
+ if(!signedIn()){document.querySelector('#cloud-admin details').open=true;el('cloud-email').focus();message('Primeiro clique em Entrar e aguarde a confirmação da sessão.');alert('Primeiro clique em Entrar e aguarde a confirmação da sessão.');return}
+
  busy=true;buttons();
  try{const p=payload(),s=signature();message('Salvando orçamento…');const result=await rpc('global_save_quote',{payload:p});if(s!==signature()){message('A versão enviada foi salva. Há alterações posteriores no formulário; abra a proposta no histórico para conferir.');invalidate();return}savedNumber=quoteNumber(result.quote_number);state.numeroOrcamento=savedNumber;savedSignature=signature();originalUpdate();persist();message('Orçamento '+savedNumber+' salvo com produtos, condições e todas as premissas da simulação.')}catch(error){message(error.message)}finally{busy=false;buttons()}
 };
