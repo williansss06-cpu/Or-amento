@@ -1,4 +1,4 @@
-import {publicRpc,approvalService} from './api.mjs';
+import {publicRpc,approvalService} from './api.mjs?v=approval1';
 import {quoteNumber} from './quote-core.mjs';
 const $=id=>document.getElementById(id),money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n/100);
 const token=new URLSearchParams(location.hash.slice(1)).get('token');

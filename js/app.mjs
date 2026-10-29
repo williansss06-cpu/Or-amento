@@ -1,5 +1,5 @@
 import {calculate,quoteNumber,normalizePhone} from './quote-core.mjs';
-import {login,logout,rpc,signedIn,approvalService} from './api.mjs';
+import {login,logout,rpc,signedIn,approvalService} from './api.mjs?v=approval1';
 import {config} from './config.mjs';
 const $=id=>document.getElementById(id),money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n/100);
 function newRequestId(){const bytes=crypto.getRandomValues(new Uint8Array(16));bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;const hex=[...bytes].map(x=>x.toString(16).padStart(2,'0')).join('');return [hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-')}
