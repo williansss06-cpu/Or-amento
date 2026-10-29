@@ -4,7 +4,7 @@
 - Repositório: williansss06-cpu/Or-amento
 - Branch de trabalho: feature/global-propostas-supabase
 - Supabase existente: Global Shop (`ntvejbsszpdubcsqjiwo`)
-- Produção: nenhuma mudança autorizada nesta etapa
+- Produção: publicação autorizada pelo usuário em 29/10/2026; migration aplicada ao Global Shop.
 
 ## Estado observado (somente leitura)
 - Supabase tem tabelas `proposals`, `leads`, `products`, `orders` e `audit_logs` com RLS habilitado.
@@ -27,3 +27,6 @@
 
 ## Atualização 29/10/2026
 Persistência autenticada, numeração, histórico e validações implementados como candidato; consulte STATUS_DESENVOLVIMENTO.md para testes e pendências atuais. A política adotada é isolamento por autor entre administradores. O antigo rascunho de schema foi substituído pela migration versionada. Aprovação e e-mail automático ainda pendentes.
+
+## Autorização de produção
+Em 29/10/2026 o usuário solicitou colocar em produção. Migration aplicada ao Global Shop, cliente ativado e publicação encaminhada à hospedagem GitHub Pages existente. A aprovação por link/e-mail permanece pendente. As restrições anteriores de não publicação foram substituídas por essa autorização.

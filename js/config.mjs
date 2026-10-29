@@ -2,5 +2,5 @@
 export const config = Object.freeze({
  url:'https://ntvejbsszpdubcsqjiwo.supabase.co',
  publishableKey:'sb_publishable_vkEfeS5z5bWwXw4_rq_qhA_grlyG7mo',
- databaseReady:false // Ativar somente depois da homologacao e aplicacao da migration.
+ databaseReady:true // Migration aplicada ao Global Shop em 29/10/2026.
 });
