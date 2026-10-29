@@ -1,0 +1,3 @@
+-- Rascunho substituido pelo candidato de migration versionado:
+-- ../migrations/20261029211003_global_quotes_authenticated_persistence.sql
+-- Nao executar este arquivo. Migration ainda nao aplicada ao Global Shop.

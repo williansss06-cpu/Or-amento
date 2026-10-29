@@ -1,0 +1,30 @@
+{
+  "name": "global-orcamentos",
+  "version": "1.0.0",
+  "description": "Sistema de Orçamentos Global",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
+    "dev": "node scripts/dev.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/williansss06-cpu/Or-amento.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/williansss06-cpu/Or-amento/issues"
+  },
+  "homepage": "https://github.com/williansss06-cpu/Or-amento#readme",
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.13",
+    "supabase": "2.122.0"
+  },
+  "private": true
+}
