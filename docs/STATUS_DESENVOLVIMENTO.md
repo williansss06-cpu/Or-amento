@@ -35,10 +35,13 @@ O usuário solicitou expressamente colocar em produção. Esta autorização sub
 Para reverter a interface, restaurar a main para o conteúdo do commit anterior à publicação `0ea179d6de2c3f0c74271d548c5966d595e6b603` por novo commit. O backend novo pode permanecer isolado e sem uso; não apagar o schema nem orçamentos reais. Não alterar tabelas da loja.
 
 ## Pendências funcionais
-- Aprovação por link, snapshot formal e token de uso único.
-- Provedor de e-mail transacional e notificação automática para globalacessoriosemgeral@gmail.com.
+- Aprovação por link, snapshot e token de uso único: implementados na atualização abaixo.
+- Credenciais do provedor de e-mail para ativar a notificação automática a globalacessoriosemgeral@gmail.com.
 - Teste completo de login/salvamento com credenciais do administrador no navegador; não foram solicitadas nem manipuladas senhas do usuário.
 - Teste de concorrência em conexões PostgreSQL independentes.
 
 ## Advisors
 Os avisos preexistentes de funções da loja não foram alterados. Referências: https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable e https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
+
+## Atualização — aprovação e e-mail
+O aceite por link e o worker de notificação foram implementados; consulte APROVACAO_E_EMAIL.md. Migration aplicada e função implantada. Validação atual: 20 testes aprovados, mais teste transacional no banco real com rollback. Envio real bloqueado por falta de GLOBAL_RESEND_API_KEY e GLOBAL_EMAIL_FROM; health retorna email_configured=false. Não declarar o e-mail automático ativo até configurar e confirmar envio.

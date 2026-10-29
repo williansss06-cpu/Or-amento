@@ -1,20 +1,24 @@
 import {calculate,quoteNumber,normalizePhone} from './quote-core.mjs';
-import {login,logout,rpc,signedIn} from './api.mjs';
+import {login,logout,rpc,signedIn,approvalService} from './api.mjs';
 import {config} from './config.mjs';
 const $=id=>document.getElementById(id),money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n/100);
 function newRequestId(){const bytes=crypto.getRandomValues(new Uint8Array(16));bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;const hex=[...bytes].map(x=>x.toString(16).padStart(2,'0')).join('');return [hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-')}
-let requestId=newRequestId(),lastPayload='',saved=false,busy=false,offset=0;
+let requestId=newRequestId(),lastPayload='',saved=false,busy=false,offset=0,currentApproval=null;
 function status(message){$('status').textContent=message}
 function formItems(){return [...document.querySelectorAll('.item')].map(el=>({description:el.querySelector('.desc').value,quantity:el.querySelector('.qty').value,price:el.querySelector('.price').value}));}
 function totals(){return calculate(formItems(),$('frete').value,$('desconto').value)}
 function updateButtons(){
+ $('gerar-link').disabled=busy||!saved||!signedIn()||Boolean(currentApproval?.approved_at);
+ $('copiar-link').disabled=busy||!$('approval-link').value;
+ $('ver-aceite').disabled=busy||!saved;
+ $('reenviar-email').disabled=busy||!currentApproval?.approved_at||currentApproval?.email_status==='sent';
  $('salvar').disabled=busy||saved||!signedIn()||!config.databaseReady;
  $('historico').disabled=busy||!signedIn()||!config.databaseReady;
  $('entrar').disabled=busy;$('novo').disabled=busy;$('sair').disabled=busy;
  document.querySelectorAll('#history-list button').forEach(el=>el.disabled=busy);
  document.querySelectorAll('main input:not(#numero),main textarea,#add,.remove').forEach(el=>el.disabled=busy);
 }
-function dirty(){if(saved||lastPayload){requestId=newRequestId();lastPayload='';saved=false;$('numero').value='RASCUNHO (sem número)';status('Alterações pendentes. Ao salvar, será criada uma nova proposta.')}recalc();updateButtons()}
+function dirty(){currentApproval=null;$('approval-panel').hidden=true;$('approval-link').value='';$('approval-print').hidden=true;$('approval-print-link').removeAttribute('href');if(saved||lastPayload){requestId=newRequestId();lastPayload='';saved=false;$('numero').value='RASCUNHO (sem número)';status('Alterações pendentes. Ao salvar, será criada uma nova proposta.')}recalc();updateButtons()}
 function addItem(d={}){
  const el=document.createElement('div');el.className='item';
  el.innerHTML='<div class="description"><label>Produto / descrição</label><input class="desc" maxlength="500"></div><div><label>Quantidade</label><input class="qty" type="number" min="1" max="1000000" step="1"></div><div><label>Valor unit. R$</label><input class="price" type="number" min="0" step=".01"></div><div><label>Subtotal</label><input class="subtotal" readonly></div><button type="button" class="remove secondary" aria-label="Remover produto">×</button>';
@@ -31,7 +35,7 @@ function payload(){
  if($('email').value&&!$('email').checkValidity()) throw new Error('Verifique o e-mail do cliente.');
  return {request_id:requestId,customer_name:$('cliente').value.trim(),customer_tax_id:$('cnpj').value.trim(),customer_email:$('email').value.trim(),customer_phone:normalizePhone($('telefone').value),contact_name:$('contato').value.trim(),notes:$('observacoes').value.trim(),items:calculated.items.map(({line_total_cents,...item})=>item),shipping_cents:calculated.shipping_cents,discount_cents:calculated.discount_cents};
 }
-function summary(){payload();return 'Proposta '+$('numero').value+'\nCliente: '+$('cliente').value+'\nValor: '+money(totals().total_cents)+'\nContato: '+$('contato').value+'\n\nPDF disponível mediante anexo.'}
+function summary(){payload();return 'Proposta '+$('numero').value+'\nCliente: '+$('cliente').value+'\nValor: '+money(totals().total_cents)+'\nContato: '+$('contato').value+($('approval-link').value?'\n\nConfira e aprove sua proposta: '+$('approval-link').value:'')+'\n\nPDF disponível mediante anexo.'}
 $('add').onclick=()=>{addItem();dirty()};
 ['cliente','cnpj','contato','email','telefone','observacoes','frete','desconto'].forEach(id=>$(id).addEventListener('input',dirty));
 $('pdf').onclick=()=>{try{payload();document.title='Global_'+(saved?$('numero').value:'Rascunho');window.print()}catch(e){status(e.message)}};
@@ -68,11 +72,40 @@ async function load(id){
   for(const [input,key] of Object.entries({cliente:'customer_name',cnpj:'customer_tax_id',contato:'contact_name',email:'customer_email',telefone:'customer_phone',observacoes:'notes'})) $(input).value=q[key]||'';
   $('frete').value=(q.shipping_cents/100).toFixed(2);$('desconto').value=(q.discount_cents/100).toFixed(2);$('itens').replaceChildren();
   for(const item of q.items) addItem({description:item.description,quantity:item.quantity,price:(item.unit_price_cents/100).toFixed(2)});
-  requestId=q.id;saved=true;lastPayload='';$('numero').value=quoteNumber(q.quote_number);recalc();status('Proposta salva carregada. Alterações gerarão uma nova proposta.');
+  $('approval-panel').hidden=true;$('approval-link').value='';$('approval-print').hidden=true;$('approval-print-link').removeAttribute('href');requestId=q.id;saved=true;lastPayload='';$('numero').value=quoteNumber(q.quote_number);recalc();status('Proposta salva carregada. Alterações gerarão uma nova proposta.');await refreshApproval();
  }catch(error){status(error.message)}finally{busy=false;updateButtons()}
 }
-function reset(){requestId=newRequestId();lastPayload='';saved=false;for(const id of ['cliente','cnpj','contato','email','telefone','observacoes']) $(id).value='';$('frete').value=0;$('desconto').value=0;$('numero').value='RASCUNHO (sem número)';$('itens').replaceChildren();addItem({description:'Cinta de amarração'});status('Rascunho local. Nenhum dado enviado.');updateButtons()}
+function reset(){currentApproval=null;$('approval-panel').hidden=true;$('approval-link').value='';$('approval-print').hidden=true;$('approval-print-link').removeAttribute('href');requestId=newRequestId();lastPayload='';saved=false;for(const id of ['cliente','cnpj','contato','email','telefone','observacoes']) $(id).value='';$('frete').value=0;$('desconto').value=0;$('numero').value='RASCUNHO (sem número)';$('itens').replaceChildren();addItem({description:'Cinta de amarração'});status('Rascunho local. Nenhum dado enviado.');updateButtons()}
 $('novo').onclick=()=>{if(confirm('Limpar o formulário para iniciar outro orçamento?'))reset()};
 $('historico').onclick=()=>{offset=0;history()};$('anterior').onclick=()=>{offset=Math.max(0,offset-50);history()};$('proxima').onclick=()=>{offset+=50;history()};
 window.addEventListener('beforeunload',e=>{if(!saved&&($('cliente').value||lastPayload)){e.preventDefault();e.returnValue=''}});
 reset();
+
+const emailLabels={pending:'Notificação aguardando envio.',failed:'Falha no envio; aprovação preservada.',sent:'Notificação enviada ao provedor.',sending:'Notificação em processamento.',pending_configuration:'Notificação pendente: configurar o provedor de e-mail.',already_sent_or_processing:'Notificação já enviada ou em processamento.'};
+async function refreshApproval(){
+ const state=await rpc('global_approval_status',{quote_id:requestId});currentApproval=state;
+ $('approval-panel').hidden=false;
+ $('gerar-link').disabled=busy||Boolean(state.approved_at);
+ $('reenviar-email').disabled=busy||!state.approved_at||state.email_status==='sent';
+ $('approval-status').textContent=state.approved_at?'Aprovado por '+state.approver_name+' em '+new Date(state.approved_at).toLocaleString('pt-BR')+'. '+(emailLabels[state.email_status]||''):(state.expires_at?'Aguardando aprovação. Link válido até '+new Date(state.expires_at).toLocaleString('pt-BR')+'.':'Nenhum link emitido para esta proposta.');
+ return state;
+}
+$('gerar-link').onclick=async()=>{
+ if(!saved||!signedIn()) return;
+ if(!confirm('Gerar link válido por 7 dias? Caso já exista outro link desta proposta, ele será substituído.')) return;
+ busy=true;updateButtons();
+ try{
+  const result=await rpc('global_issue_approval',{quote_id:requestId});
+  $('approval-link').value=new URL('aprovar.html',location.href).href+'#token='+result.token;
+  $('approval-print-link').href=$('approval-link').value;$('approval-print').hidden=false;
+  await refreshApproval();
+  const health=await approvalService({action:'health'});
+  if(!health.email_configured) $('approval-status').textContent+=' A notificação por e-mail aguarda configuração do provedor.';
+ }catch(error){status(error.message)}finally{busy=false;updateButtons()}
+};
+$('copiar-link').onclick=async()=>{try{if(!$('approval-link').value)throw new Error('Gere um novo link para copiá-lo.');await navigator.clipboard.writeText($('approval-link').value);status('Link de aprovação copiado.')}catch(error){status(error.message+' Você pode selecionar e copiar o campo do link.')}};
+$('ver-aceite').onclick=async()=>{try{await refreshApproval()}catch(error){status(error.message)}};
+$('reenviar-email').onclick=async()=>{
+ busy=true;updateButtons();
+ try{const result=await approvalService({action:'retry',quote_id:requestId},true);await refreshApproval();$('approval-status').textContent+=' '+(emailLabels[result.email_status]||'Envio pendente.')}catch(error){status(error.message)}finally{busy=false;updateButtons()}
+};
