@@ -18,7 +18,7 @@ async function notify(quoteId:string){
  try{
   const q=job.snapshot,money=(n:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n/100),number='GL'+String(q.quote_number).padStart(4,'0');
   const lines=q.items.map((i:{description:string;quantity:number;unit_price_cents:number;line_total_cents:number})=>`${i.description} | ${i.quantity} × ${money(i.unit_price_cents)} = ${money(i.line_total_cents)}`).join('\n');
-  const text=`APROVAÇÃO DE ORÇAMENTO GLOBAL\n\nOrçamento: ${number}\nCliente: ${q.customer_name}\nCNPJ: ${q.customer_tax_id||'Não informado'}\nAprovado por: ${job.approver_name}\nE-mail: ${job.approver_email}\nData: ${job.approved_at}\n\n${lines}\n\nFrete: ${money(q.shipping_cents)}\nDesconto: ${money(q.discount_cents)}\nTOTAL: ${money(q.total_cents)}\n\nCondições: ${q.notes||'Não informadas'}\n\nIdentificador do aceite: ${job.id}\nSHA-256 da proposta: ${job.snapshot_sha256}\n\nO aceite foi registrado no Sistema de Orçamentos Global.`;
+  const text=`APROVAÇÃO DE ORÇAMENTO GLOBAL\n\nOrçamento: ${number}\nCliente: ${q.customer_name}\nCNPJ: ${q.customer_tax_id||'Não informado'}\nAprovado por: ${job.approver_name}\nE-mail: ${job.approver_email}\nCargo: ${job.approver_role||'Não informado'}\nReferência / pedido: ${job.customer_reference||'Não informado'}\nData: ${job.approved_at}\n\n${lines}\n\nFrete: ${money(q.shipping_cents)}\nDesconto: ${money(q.discount_cents)}\nTOTAL: ${money(q.total_cents)}\n\nCondições: ${q.notes||'Não informadas'}\n\nIdentificador do aceite: ${job.id}\nSHA-256 da proposta: ${job.snapshot_sha256}\n\nO aceite foi registrado no Sistema de Orçamentos Global.`;
   const res=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json','Idempotency-Key':'global-approval-'+job.id},body:JSON.stringify({from,to:[job.recipient],subject:`Orçamento ${number} aprovado — Global`,text}),signal:AbortSignal.timeout(15000)});
   const result=await res.json();if(!res.ok||!result.id) throw new Error('Provedor recusou o envio. Verifique remetente e credencial.');
   await rpc('global_finish_email',{job_id:job.id,lease_id:job.claim_id,provider_id:result.id,error_message:null},service);
@@ -37,7 +37,7 @@ Deno.serve(async(req:Request)=>{
   const body=JSON.parse(raw);
   if(body.action==='health') return reply({email_configured:Boolean(Deno.env.get('GLOBAL_RESEND_API_KEY')&&Deno.env.get('GLOBAL_EMAIL_FROM'))});
   if(body.action==='approve'){
-   const approved=await rpc('global_accept_approval',{token:body.token,approver_name:body.approver_name,approver_email:body.approver_email,accepted_terms:body.accepted_terms});
+   const approved=await rpc('global_accept_approval_details',{token:body.token,approver_name:body.approver_name,approver_email:body.approver_email,accepted_terms:body.accepted_terms,approver_role:body.approver_role||'',customer_reference:body.customer_reference||''});
    let mail;try{mail=await notify(approved.quote_id)}catch{mail={email_status:'pending'}};
    return reply({...approved,...mail});
   }

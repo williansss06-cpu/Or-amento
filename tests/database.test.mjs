@@ -102,4 +102,20 @@ test('e-mail: worker exclusivo, lease impede disputa e envio tem confirmação s
  const state=(await as('authenticated',owner,'select public.global_approval_status($1) result',[payload().request_id])).rows[0].result;
  assert.equal(state.email_status,'sent');
 });
+test('modelo original: preserva produtos detalhados, premissas e dados de aprovação',async()=>{
+ const files=await readdir(new URL('../supabase/migrations/',import.meta.url));
+ const file=files.find(x=>x.endsWith('_preserve_global_quote_presentation.sql'));
+ await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+ const p=payload('40000000-0000-4000-8000-000000000001');
+ p.presentation={enderecoCliente:'Rua exemplo, 10',precoKgStretch:30,pallets:250,movimentos:2,segundos:38,vidaUtil:5,products:[{nome:'Cinta',tamanho:'7 m',descricao:'Zamac',qtd:3,preco:0.1}]};
+ await as('authenticated',owner,'select public.global_save_quote($1)',[p]);
+ const q=(await as('authenticated',owner,'select public.global_get_quote($1) result',[p.request_id])).rows[0].result;
+ assert.deepEqual(q.presentation,p.presentation);
+ const link=(await as('authenticated',owner,'select public.global_issue_approval($1) result',[p.request_id])).rows[0].result;
+ const publicView=(await as('anon',null,'select public.global_view_approval($1) result',[link.token])).rows[0].result;
+ assert.deepEqual(publicView.quote.presentation,p.presentation);assert.equal(publicView.quote.created_by,undefined);
+ await as('anon',null,'select public.global_accept_approval_details($1,$2,$3,true,$4,$5)',[link.token,'Cliente','cliente@example.com','Compras','PC-100']);
+ const detail=(await db.query("select approver_role,customer_reference from global_quotes.approval_links where quote_id=$1",[p.request_id])).rows[0];
+ assert.equal(detail.approver_role,'Compras');assert.equal(detail.customer_reference,'PC-100');
+});
 test.after(()=>db.close());
