@@ -36,4 +36,4 @@ function resetForm(){if(!confirm('Restaurar os valores de exemplo?'))return;loca
 function saveJSON(){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));a.download='proposta-global-'+(state.numeroOrcamento||'sem-numero')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 function loadJSON(e){let f=e.target.files[0];if(!f)return;let reader=new FileReader();reader.onload=()=>{try{let obj=JSON.parse(reader.result);config.forEach(([id,label,type,def])=>{state[id]=obj[id]??def;$(id).value=state[id]});state.products=Array.isArray(obj.products)&&obj.products.length?obj.products:defaultProducts();state.numeroOrcamento=nextNumber();syncSequence(state.numeroOrcamento);renderProductEditor();update();localStorage.setItem('global_proposta',JSON.stringify(state))}catch(err){alert('Arquivo inválido')}};reader.readAsText(f)}
 build();
-</script><script type="module" src="./js/original-integration.mjs?v=original1"></script></body></html>
+</script><script type="module" src="./js/original-integration.mjs?v=loginfix2"></script></body></html>
