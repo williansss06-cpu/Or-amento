@@ -71,9 +71,14 @@ el('cloud-issue').onclick=async()=>{
 };
 el('cloud-check').onclick=()=>checkApproval().catch(e=>message(e.message));
 el('cloud-retry').onclick=async()=>{busy=true;buttons();try{const result=await approvalService({action:'retry',quote_id:currentId},true);await checkApproval();el('cloud-approval-status').textContent+=' '+(emailText[result.email_status]||'Envio pendente.')}catch(error){message(error.message)}finally{busy=false;buttons()}};
+function requireShareReady(){
+ if(!signedIn()||!savedSignature){document.querySelector('#cloud-admin details').open=true;const text='Entre e clique em Salvar orçamento no sistema antes de compartilhar.';message(text);alert(text);return false}
+ if(!el('cloud-link').getAttribute('href')){const text='Clique em Gerar link de aprovação antes de compartilhar. O PDF deve ser gerado e anexado separadamente no WhatsApp.';message(text);el('cloud-issue').scrollIntoView({behavior:'smooth',block:'center'});alert(text);return false}
+ return true;
+}
 function shareText(){return 'Proposta Global '+state.numeroOrcamento+'\nCliente: '+state.cliente+'\nInvestimento: '+el('total').textContent+(el('cloud-link').href?'\n'+el('cloud-link').href:'\nPDF mediante anexo.')}
-el('cloud-whatsapp').onclick=()=>{try{window.open('https://wa.me/'+normalizePhone(state.telefoneCliente||'')+'?text='+encodeURIComponent(shareText()),'_blank','noopener,noreferrer')}catch(error){message(error.message)}};
-el('cloud-mail').onclick=()=>{location.href='mailto:'+encodeURIComponent(state.emailCliente||'')+'?subject='+encodeURIComponent('Proposta Global '+state.numeroOrcamento)+'&body='+encodeURIComponent(shareText())};
+el('cloud-whatsapp').onclick=()=>{if(!requireShareReady())return;try{window.open('https://wa.me/'+normalizePhone(state.telefoneCliente||'')+'?text='+encodeURIComponent(shareText()),'_blank','noopener,noreferrer')}catch(error){message(error.message)}};
+el('cloud-mail').onclick=()=>{if(!requireShareReady())return;location.href='mailto:'+encodeURIComponent(state.emailCliente||'')+'?subject='+encodeURIComponent('Proposta Global '+state.numeroOrcamento)+'&body='+encodeURIComponent(shareText())};
 el('cloud-accept').onsubmit=async e=>{
  e.preventDefault();el('cloud-accept-button').disabled=true;
  try{const result=await approvalService({action:'approve',token:new URLSearchParams(location.hash.slice(1)).get('token'),approver_name:el('approvalName').value.trim(),approver_email:el('approvalEmail').value.trim(),approver_role:el('approvalRole').value.trim(),customer_reference:el('approvalRef').value.trim(),accepted_terms:el('approvalConsent').checked});el('cloud-accept').hidden=true;el('approvalStatus').textContent='Aprovação registrada em '+new Date(result.approved_at).toLocaleString('pt-BR')+'. '+(emailText[result.email_status]||'Notificação pendente.')}catch(error){el('approvalStatus').textContent=error.message}finally{el('cloud-accept-button').disabled=false}
