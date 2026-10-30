@@ -119,3 +119,24 @@ test('modelo original: preserva produtos detalhados, premissas e dados de aprova
  assert.equal(detail.approver_role,'Compras');assert.equal(detail.customer_reference,'PC-100');
 });
 test.after(()=>db.close());
+
+test('loja: acesso restrito, vínculo atômico e etapas sincronizadas',async()=>{
+ await db.exec(`create type public.lead_stage as enum ('new','contacted','proposal_sent','negotiation','won','lost');
+ create table public.products(id bigint primary key,name text,short_description text,base_price_cents integer,promotional_price_cents integer,promotion_starts_at timestamptz,promotion_ends_at timestamptz);
+ create table public.leads(id uuid primary key,company_name text,tax_id text,contact_name text,email text,phone text,quantity integer,stage public.lead_stage,source text,created_at timestamptz default now(),product_id bigint,won_at timestamptz,updated_at timestamptz);
+ insert into public.products values(1,'Cinta','25 mm',1500,null,null,null);
+ insert into public.leads(id,company_name,quantity,stage,source,product_id) values('90000000-0000-4000-8000-000000000001','Loja teste',10,'new','commercial_calculator',1);`);
+ const file=(await readdir(new URL('../supabase/migrations/',import.meta.url))).find(x=>x.endsWith('_shop_quote_integration.sql'));
+ await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+ for(const [role,id] of [['anon',null],['authenticated',customer],['authenticated',inactive]])await assert.rejects(()=>as(role,id,'select public.global_shop_leads()'));
+ const leads=(await as('authenticated',owner,'select public.global_shop_leads() result')).rows[0].result;
+ assert.equal(leads[0].product_name,'Cinta');
+ const p=payload('90000000-0000-4000-8000-000000000002');
+ await as('authenticated',owner,'select public.global_save_shop_quote($1,$2)',[p,leads[0].id]);
+ await assert.rejects(()=>as('authenticated',other,'select public.global_save_shop_quote($1,$2)',[p,leads[0].id]),/Acesso negado/);
+ const token=(await as('authenticated',owner,'select public.global_issue_approval($1) result',[p.request_id])).rows[0].result.token;
+ assert.equal((await db.query('select stage from public.leads')).rows[0].stage,'proposal_sent');
+ await as('anon',null,'select public.global_accept_approval($1,$2,$3,true)',[token,'Teste','teste@example.com']);
+ assert.equal((await db.query('select stage from public.leads')).rows[0].stage,'won');
+ assert.equal((await as('authenticated',owner,'select public.global_shop_leads() result')).rows[0].result[0].quote_id,p.request_id);
+});

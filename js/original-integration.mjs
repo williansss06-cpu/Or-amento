@@ -2,6 +2,7 @@ import {login,logout,rpc,signedIn,publicRpc,approvalService} from './api.mjs?v=o
 import {calculate,quoteNumber,normalizePhone} from './quote-core.mjs';
 const el=id=>document.getElementById(id),isPublic=location.pathname.endsWith('/aprovar.html');
 function uuid(){const b=crypto.getRandomValues(new Uint8Array(16));b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;const h=[...b].map(x=>x.toString(16).padStart(2,'0')).join('');return [h.slice(0,8),h.slice(8,12),h.slice(12,16),h.slice(16,20),h.slice(20)].join('-')}
+let sourceLeadId=null;
 let currentId=uuid(),savedSignature=null,savedNumber=null,loading=false,busy=false,approval=null;
 const signature=()=>JSON.stringify({...state,numeroOrcamento:undefined});
 const message=s=>{el('cloud-status').textContent=s};
@@ -9,6 +10,7 @@ const emailText={sent:'Notificação enviada ao provedor.',pending:'Notificaçã
 function buttons(){
  document.querySelectorAll('#fields input,#fields textarea,#fields button,.toolbar button,#cloud-history-list button,#cloud-login button').forEach(x=>x.disabled=busy);
  el('cloud-save').disabled=busy||Boolean(savedSignature);el('cloud-save').textContent=!signedIn()?'Entrar para salvar orçamento':'Salvar orçamento no sistema';
+ if(el('shop-leads'))el('shop-leads').disabled=busy||!signedIn();
  el('cloud-history').disabled=busy||!signedIn();el('cloud-logout').hidden=!signedIn();
  el('cloud-issue').disabled=busy||!savedSignature||!signedIn()||Boolean(approval?.approved_at);
  el('cloud-check').disabled=busy||!savedSignature||!signedIn();
@@ -17,7 +19,7 @@ function buttons(){
 function invalidate(){currentId=uuid();savedSignature=null;savedNumber=null;approval=null;state.numeroOrcamento='RASCUNHO (sem número)';el('cloud-link').textContent='';el('cloud-link').removeAttribute('href');el('cloud-print-link').hidden=true;el('cloud-print-anchor').removeAttribute('href');el('cloud-approval-status').textContent='Salve as alterações para gerar o link desta nova proposta.';buttons()}
 const originalUpdate=window.update;
 window.update=function(){if(!loading&&savedSignature&&(signature()!==savedSignature||state.numeroOrcamento!==savedNumber))invalidate();originalUpdate();buttons()};
-document.addEventListener('global-new-quote',()=>{invalidate();window.update();message('Novo rascunho. A numeração oficial será gerada ao salvar.')});
+document.addEventListener('global-new-quote',()=>{sourceLeadId=null;invalidate();window.update();message('Novo rascunho. A numeração oficial será gerada ao salvar.')});
 function payload(){
  const totals=calculate(state.products.map(p=>({description:[p.nome,p.tamanho,p.descricao].filter(Boolean).join(' · '),quantity:p.qtd,price:p.preco})),state.custoFrete,state.desc);
  if(!String(state.cliente||'').trim())throw new Error('Informe a empresa cliente.');
@@ -43,7 +45,7 @@ function restore(q){
   });
   state.numeroOrcamento=quoteNumber(q.quote_number);
   config.forEach(([id])=>{el(id).value=state[id]});renderProductEditor();originalUpdate();
-  currentId=q.id;savedNumber=state.numeroOrcamento;savedSignature=signature();
+  sourceLeadId=q.source_lead_id||null;currentId=q.id;savedNumber=state.numeroOrcamento;savedSignature=signature();
   el('cloud-link').textContent='';el('cloud-link').removeAttribute('href');el('cloud-print-link').hidden=true;el('cloud-print-anchor').removeAttribute('href');
  }finally{loading=false;buttons()}
 }
@@ -55,12 +57,12 @@ el('cloud-login').onsubmit=async e=>{
  e.preventDefault();busy=true;buttons();
  try{message('Entrando no sistema…');await login(el('cloud-email').value.trim(),el('cloud-password').value);el('cloud-login').hidden=true;message('Sessão iniciada. O modelo original pode ser salvo no Supabase.')}catch(error){const detail=error.message==='Invalid login credentials'?'E-mail ou senha não conferem. Use a conta administrativa cadastrada no Global Shop.':error.message;message(detail);alert(detail)}finally{el('cloud-password').value='';busy=false;buttons()}
 };
-el('cloud-logout').onclick=async()=>{try{await logout()}catch{}finally{el('cloud-login').hidden=false;el('cloud-history-list').replaceChildren();invalidate();window.update();message('Sessão encerrada.')}};
+el('cloud-logout').onclick=async()=>{try{await logout()}catch{}finally{el('cloud-login').hidden=false;el('cloud-history-list').replaceChildren();el('shop-lead-list')?.replaceChildren();sourceLeadId=null;invalidate();window.update();message('Sessão encerrada.')}};
 el('cloud-save').onclick=async()=>{
  if(!signedIn()){document.querySelector('#cloud-admin details').open=true;el('cloud-email').focus();message('Primeiro clique em Entrar e aguarde a confirmação da sessão.');alert('Primeiro clique em Entrar e aguarde a confirmação da sessão.');return}
 
  busy=true;buttons();
- try{const p=payload(),s=signature();message('Salvando orçamento…');const result=await rpc('global_save_quote',{payload:p});if(s!==signature()){message('A versão enviada foi salva. Há alterações posteriores no formulário; abra a proposta no histórico para conferir.');invalidate();return}savedNumber=quoteNumber(result.quote_number);state.numeroOrcamento=savedNumber;savedSignature=signature();originalUpdate();persist();message('Orçamento '+savedNumber+' salvo com produtos, condições e todas as premissas da simulação.')}catch(error){message(error.message)}finally{busy=false;buttons()}
+ try{const p=payload(),s=signature();message('Salvando orçamento…');const result=await rpc(sourceLeadId?'global_save_shop_quote':'global_save_quote',sourceLeadId?{payload:p,lead_id:sourceLeadId}:{payload:p});if(s!==signature()){message('A versão enviada foi salva. Há alterações posteriores no formulário; abra a proposta no histórico para conferir.');invalidate();return}savedNumber=quoteNumber(result.quote_number);state.numeroOrcamento=savedNumber;savedSignature=signature();originalUpdate();persist();message('Orçamento '+savedNumber+' salvo com produtos, condições e todas as premissas da simulação.')}catch(error){message(error.message)}finally{busy=false;buttons()}
 };
 el('cloud-history').onclick=async()=>{
  busy=true;buttons();
@@ -85,6 +87,39 @@ el('cloud-accept').onsubmit=async e=>{
  e.preventDefault();el('cloud-accept-button').disabled=true;
  try{const result=await approvalService({action:'approve',token:new URLSearchParams(location.hash.slice(1)).get('token'),approver_name:el('approvalName').value.trim(),approver_email:el('approvalEmail').value.trim(),approver_role:el('approvalRole').value.trim(),customer_reference:el('approvalRef').value.trim(),accepted_terms:el('approvalConsent').checked});el('cloud-accept').hidden=true;el('approvalStatus').textContent='Aprovação registrada em '+new Date(result.approved_at).toLocaleString('pt-BR')+'. '+(emailText[result.email_status]||'Notificação pendente.')}catch(error){el('approvalStatus').textContent=error.message}finally{el('cloud-accept-button').disabled=false}
 };
+
+if(!isPublic){
+ const button=document.createElement('button');button.id='shop-leads';button.className='secondary';button.textContent='Solicitações da loja';
+ el('cloud-history').after(button);
+ const list=document.createElement('div');list.id='shop-lead-list';el('cloud-history-list').after(list);
+ button.onclick=async()=>{
+  busy=true;buttons();
+  try{
+   const rows=await rpc('global_shop_leads');list.replaceChildren();
+   for(const lead of rows){
+    const row=document.createElement('p'),b=document.createElement('button');b.className='secondary';
+    b.textContent=lead.company_name+' · '+lead.stage+(lead.quote_id?' · Abrir orçamento':' · Revisar solicitação');
+    b.onclick=async()=>{
+     if(!confirm('Carregar esta solicitação e substituir o formulário atual?'))return;
+     busy=true;buttons();
+     try{
+      if(lead.quote_id){restore(await rpc('global_get_quote',{quote_id:lead.quote_id}));await checkApproval();return}
+      if(!lead.product_name||!Number.isInteger(lead.quantity)||lead.quantity<1||lead.quantity>1000000)throw new Error('Solicitação sem produto ou quantidade válida. Confira o cadastro da loja.');
+      loading=true;sourceLeadId=lead.id;invalidate();
+      config.forEach(([id,label,type,def])=>{state[id]=def});
+      Object.assign(state,{cliente:lead.company_name,cnpjCliente:lead.tax_id||'',contato:lead.contact_name||'',emailCliente:lead.email||'',telefoneCliente:lead.phone||'',pallets:0,precoKgStretch:0,converter:0,movimentos:0,aplicacoesStretch:0,condicoes:'Solicitação recebida pela loja. Quantidade e preço sujeitos à revisão comercial. Premissas de economia devem ser preenchidas e conferidas antes do envio.'});
+      const now=Date.now(),promo=lead.promotional_price_cents!=null&&(!lead.promotion_starts_at||Date.parse(lead.promotion_starts_at)<=now)&&(!lead.promotion_ends_at||Date.parse(lead.promotion_ends_at)>=now);
+      state.products=[{nome:lead.product_name,tamanho:'',descricao:lead.short_description||'',qtd:lead.quantity,preco:(promo?lead.promotional_price_cents:lead.base_price_cents)/100}];
+      config.forEach(([id])=>{el(id).value=state[id]});renderProductEditor();originalUpdate();persist();
+      message('Solicitação importada. Revise produto, quantidade, preço e premissas; depois salve para gerar o número GL.');
+     }catch(error){message(error.message)}finally{loading=false;busy=false;buttons()}
+    };row.append(b);list.append(row);
+   }
+   message(rows.length?'Solicitações recentes da calculadora da loja.':'Nenhuma solicitação da calculadora encontrada.');
+  }catch(error){message(error.message)}finally{busy=false;buttons()}
+ };
+}
+
 if(isPublic){
  document.querySelectorAll('.no-print').forEach(x=>x.hidden=true);
  try{const view=await publicRpc('global_view_approval',{token:new URLSearchParams(location.hash.slice(1)).get('token')});restore(view.quote);el('cloud-terms').textContent=view.terms;el('cloud-accept').hidden=Boolean(view.approved_at);el('approvalStatus').textContent=view.approved_at?'Proposta aprovada em '+new Date(view.approved_at).toLocaleString('pt-BR'):'';await brandImages();document.documentElement.classList.remove('public-loading')}catch(error){document.querySelector('.proposal').hidden=true;document.documentElement.classList.remove('public-loading');const p=document.createElement('p');p.setAttribute('role','status');p.textContent=error.message;document.querySelector('.app').append(p)}
