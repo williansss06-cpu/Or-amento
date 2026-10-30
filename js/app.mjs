@@ -96,7 +96,7 @@ $('gerar-link').onclick=async()=>{
  busy=true;updateButtons();
  try{
   const result=await rpc('global_issue_approval',{quote_id:requestId});
-  $('approval-link').value='https://globalacessorioslogisticos.com.br/Or-amento/aprovar.html#token='+result.token;
+  $('approval-link').value='https://globalacessorioslogisticos.com.br/proposta/aprovar#token='+result.token;
   $('approval-print-link').href=$('approval-link').value;$('approval-print').hidden=false;
   await refreshApproval();
   const health=await approvalService({action:'health'});
