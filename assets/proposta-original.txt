@@ -41,8 +41,7 @@ function prepareApprovalEmail(){
  const products=state.products.map((p,i)=>`${i+1}. ${p.nome||'Cinta'} ${p.tamanho||''} | ${Number(p.qtd||0).toLocaleString('pt-BR')} un. × ${money(p.preco)} = ${money((Number(p.qtd)||0)*(Number(p.preco)||0))}`).join('\n');
  const subject=`APROVAÇÃO ${state.numeroOrcamento||''} - PROPOSTA GLOBAL - ${state.cliente||'Cliente'} - ${money(total)}`;
  const body=`APROVAÇÃO COMERCIAL - GLOBAL ACESSÓRIOS E SOLUÇÕES LOGÍSTICAS\n\nNúmero do orçamento: ${state.numeroOrcamento||''}\nEmpresa: ${state.cliente||''}\nCNPJ: ${state.cnpjCliente||''}\nEndereço: ${state.enderecoCliente||''}\nAprovador: ${name}\nCargo: ${role}\nE-mail: ${email}\nReferência: ${ref}\nData da proposta: ${state.data||''}\n\nITENS APROVADOS\n${products}\n\nSubtotal: ${money(subtotal)}\nFrete: ${money(freight)}\nDesconto: ${money(discount)}\nVALOR TOTAL: ${money(total)}\n\nCONDIÇÕES COMERCIAIS\n${state.condicoes||''}\n\nDeclaro que conferi e aprovo os itens, quantidades, valores e condições acima, sujeito à confirmação de recebimento pela Global.\n\nEnviado por: ${name} <${email}>`;
- document.getElementById('approvalStatus').textContent='Seu aplicativo de e-mail será aberto. Confira e clique em Enviar para concluir a solicitação de aprovação.';
- window.location.href='mailto:globalacessoriosemgeral@gmail.com?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+ document.getElementById('approvalStatus').textContent='A aprovação é registrada diretamente nesta página. Preencha os dados e confirme a aprovação.';
 }
 build();
 </script></body></html>

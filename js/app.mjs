@@ -40,7 +40,7 @@ $('add').onclick=()=>{addItem();dirty()};
 ['cliente','cnpj','contato','email','telefone','observacoes','frete','desconto'].forEach(id=>$(id).addEventListener('input',dirty));
 $('pdf').onclick=()=>{try{payload();document.title='Global_'+(saved?$('numero').value:'Rascunho');window.print()}catch(e){status(e.message)}};
 $('whatsapp').onclick=()=>{try{window.open('https://wa.me/'+normalizePhone($('telefone').value)+'?text='+encodeURIComponent('Olá! Segue resumo da proposta comercial Global:\n'+summary()),'_blank','noopener,noreferrer')}catch(e){status(e.message)}};
-$('mail').onclick=()=>{try{window.location.href='mailto:'+encodeURIComponent($('email').value.trim())+'?subject='+encodeURIComponent('Proposta comercial Global - '+$('numero').value)+'&body='+encodeURIComponent('Olá,\n\n'+summary()+'\n\nAtenciosamente,\nGlobal Acessórios e Soluções Logísticas')}catch(e){status(e.message)}};
+$('mail').onclick=()=>{status('Para enviar pelo Zoho Mail, abra o acompanhamento de orçamentos no painel administrativo.');};
 $('login-form').onsubmit=async e=>{
  e.preventDefault();busy=true;updateButtons();
  try{await login($('login-email').value.trim(),$('login-password').value);$('usuario').textContent=$('login-email').value.trim();$('login-form').hidden=true;$('sessao').hidden=false;$('auth-status').textContent=config.databaseReady?'Sessão iniciada.':'Sessão iniciada. Banco aguardando homologação.'}catch(error){$('auth-status').textContent=error.message}finally{$('login-password').value='';busy=false;updateButtons()}
